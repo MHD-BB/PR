@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Home OOP — نظام إدارة الأحمال الكهربائية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════
+     DESIGN TOKENS
+  ═══════════════════════════════════════════ */
+  :root {
+    --bg:          #0d1117;
+    --surface:     #161b22;
+    --surface2:    #1c2330;
+    --border:      #30363d;
+    --electric:    #00d4ff;
+    --electric-dim:#00d4ff22;
+    --amber:       #f4a62a;
+    --amber-dim:   #f4a62a18;
+    --green:       #3fb950;
+    --red:         #f85149;
+    --text:        #e6edf3;
+    --muted:       #8b949e;
+    --code-bg:     #010409;
+    --radius:      12px;
+    --radius-sm:   8px;
+    --shadow:      0 8px 32px rgba(0,0,0,0.5);
+    --shadow-glow: 0 0 30px rgba(0,212,255,0.15);
+  }
+
+  /* ═══════════════════════════════════════════
+     RESET + BASE
+  ═══════════════════════════════════════════ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans Arabic', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    line-height: 1.6;
+  }
+
+  /* ═══════════════════════════════════════════
+     LAYOUT SHELL
+  ═══════════════════════════════════════════ */
+  .app {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh;
+  }
+
+  /* ═══════════════════════════════════════════
+     TOP NAV
+  ═══════════════════════════════════════════ */
+  .topnav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,17,23,0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 clamp(1rem, 4vw, 3rem);
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px;
+  }
+  .topnav-brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 0.95rem; letter-spacing: -0.01em;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .brand-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--electric), #0090cc);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .topnav-pills {
+    display: flex; gap: 6px; list-style: none;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .topnav-pills::-webkit-scrollbar { display: none; }
+  .pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    border: 1px solid transparent;
+    color: var(--muted);
+    background: transparent;
+    transition: all 0.2s;
+  }
+  .pill:hover { color: var(--text); border-color: var(--border); }
+  .pill.active {
+    background: var(--electric-dim);
+    border-color: var(--electric);
+    color: var(--electric);
+  }
+
+  /* ═══════════════════════════════════════════
+     HERO SECTION
+  ═══════════════════════════════════════════ */
+  .hero {
+    position: relative; overflow: hidden;
+    padding: clamp(3rem, 8vh, 6rem) clamp(1rem, 6vw, 5rem);
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    gap: 1.5rem;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 70% 60% at 50% 0%, rgba(0,212,255,0.08), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--electric);
+    background: var(--electric-dim); border: 1px solid rgba(0,212,255,0.3);
+    padding: 5px 14px; border-radius: 20px;
+  }
+  .hero-eyebrow span { width: 6px; height: 6px; border-radius: 50%; background: var(--electric); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
+  .hero h1 {
+    font-size: clamp(2rem, 6vw, 4rem);
+    font-weight: 700; line-height: 1.1;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #fff 30%, var(--muted) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--electric), #00a3c4);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-sub {
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
+    color: var(--muted); max-width: 560px;
+    font-weight: 400;
+  }
+  .hero-team {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
+  }
+  .avatar-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 12px 5px 6px;
+    font-size: 0.8rem; color: var(--muted); font-weight: 500;
+  }
+  .avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff;
+  }
+  .hero-scroll {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--muted); font-size: 0.8rem; cursor: pointer;
+    animation: float 2.5s ease-in-out infinite;
+    border: none; background: none; color: var(--muted);
+  }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+
+  /* ═══════════════════════════════════════════
+     STATS BAR
+  ═══════════════════════════════════════════ */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px; background: var(--border);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat {
+    background: var(--surface);
+    padding: 1.5rem 2rem;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .stat-value { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.04em; }
+  .stat-label { font-size: 0.75rem; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* ═══════════════════════════════════════════
+     MAIN CONTENT GRID
+  ═══════════════════════════════════════════ */
+  .content-grid {
+    max-width: 1200px; margin: 0 auto;
+    padding: clamp(2rem, 5vh, 4rem) clamp(1rem, 4vw, 3rem);
+    display: flex; flex-direction: column; gap: 3rem;
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION HEADERS
+  ═══════════════════════════════════════════ */
+  .section-header {
+    display: flex; align-items: center; gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .section-tag {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--electric);
+    background: var(--electric-dim); padding: 3px 10px; border-radius: 4px;
+  }
+  .section-title {
+    font-size: clamp(1.2rem, 3vw, 1.6rem);
+    font-weight: 700; letter-spacing: -0.02em;
+  }
+  .section-line {
+    flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ═══════════════════════════════════════════
+     CONCEPT CARDS
+  ═══════════════════════════════════════════ */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .concept-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    cursor: default;
+  }
+  .concept-card:hover {
+    border-color: var(--electric);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-glow);
+  }
+  .card-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; margin-bottom: 1rem;
+  }
+  .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+  .card-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.7; }
+  .card-badge {
+    display: inline-block; margin-top: 12px;
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 3px 10px; border-radius: 20px; border: 1px solid;
+  }
+
+  /* ═══════════════════════════════════════════
+     UML DIAGRAM
+  ═══════════════════════════════════════════ */
+  .uml-wrapper {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    overflow-x: auto;
+  }
+  .uml-diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    min-width: 320px;
+  }
+  .uml-class {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    min-width: 220px;
+    width: 260px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .uml-class.base { border-color: var(--electric); }
+  .uml-class.child { border-color: #a371f7; }
+  .uml-head {
+    padding: 10px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .uml-head.base { background: rgba(0,212,255,0.1); color: var(--electric); }
+  .uml-head.child { background: rgba(163,113,247,0.1); color: #a371f7; }
+  .uml-stereotype { font-size: 0.65rem; opacity: 0.7; font-weight: 400; }
+  .uml-body { padding: 10px 16px; }
+  .uml-field {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; color: var(--muted);
+    padding: 2px 0;
+    display: flex; gap: 6px;
+  }
+  .uml-access { color: #f4a62a; min-width: 10px; }
+  .uml-ftype { color: #4ec9b0; }
+  .uml-fname { color: var(--text); }
+  .uml-divider { height: 1px; background: var(--border); margin: 8px 0; }
+  .uml-method { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #dcdcaa; padding: 2px 0; }
+  .uml-connector {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 8px 0;
+  }
+  .uml-line { width: 2px; height: 32px; background: var(--border); }
+  .uml-arrow { font-size: 20px; color: var(--border); line-height: 1; margin-top: -4px; }
+  .uml-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.06em; }
+  .uml-children {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px; width: 100%; max-width: 560px;
+  }
+  .child-connector {
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+  }
+  .uml-branch {
+    width: 100%; height: 20px; position: relative;
+    display: flex; justify-content: center;
+  }
+  .uml-branch::before {
+    content:''; position: absolute;
+    top: 0; left: 50%; right: 50%;
+    height: 1px; background: var(--border);
+  }
+  /* horizontal line connecting children */
+  .uml-hline {
+    height: 1px; width: 100%; background: var(--border);
+    margin: 0;
+  }
+  .children-row {
+    display: flex; width: 100%; max-width: 560px;
+    align-items: flex-start; gap: 16px; position: relative;
+  }
+  .children-row::before {
+    content: '';
+    position: absolute; top: 0;
+    left: calc(50% - 130px + 12px);
+    right: calc(50% - 130px + 12px);
+    height: 1px; background: var(--border);
+  }
+
+  /* ═══════════════════════════════════════════
+     CODE BLOCKS
+  ═══════════════════════════════════════════ */
+  .code-panel {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .code-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .code-dots { display: flex; gap: 6px; }
+  .code-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .code-filename {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; color: var(--muted);
+  }
+  .code-lang {
+    font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted);
+    background: var(--surface2); padding: 2px 8px; border-radius: 4px;
+  }
+  pre.code-body {
+    padding: 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(0.72rem, 1.5vw, 0.85rem);
+    line-height: 1.7;
+    overflow-x: auto;
+    direction: ltr; text-align: left;
+    margin: 0;
+    tab-size: 2;
+  }
+  .kw  { color: #569cd6; font-weight: 600; }
+  .tp  { color: #4ec9b0; }
+  .st  { color: #ce9178; }
+  .cm  { color: #6a9955; font-style: italic; }
+  .nm  { color: #b5cea8; }
+  .fn  { color: #dcdcaa; }
+  .op  { color: #c586c0; }
+
+  /* ═══════════════════════════════════════════
+     SPLIT LAYOUT (code + visual)
+  ═══════════════════════════════════════════ */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    .split { grid-template-columns: 1fr; }
+  }
+
+  /* ═══════════════════════════════════════════
+     CONSOLE / TERMINAL
+  ═══════════════════════════════════════════ */
+  .terminal {
+    background: #010409;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .terminal-header {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .terminal-title { font-size: 0.75rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .terminal-body {
+    padding: 1.2rem 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(0.75rem, 1.5vw, 0.85rem);
+    line-height: 1.9;
+    direction: ltr; text-align: left;
+  }
+  .t-prompt { color: var(--green); }
+  .t-cmd { color: var(--text); }
+  .t-out { color: #8b949e; }
+  .t-info { color: var(--electric); }
+  .t-warn { color: var(--red); font-weight: 700; }
+  .cursor { display: inline-block; width: 8px; height: 14px; background: var(--green); vertical-align: middle; animation: blink 1s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ═══════════════════════════════════════════
+     ALERT / WARNING CARD
+  ═══════════════════════════════════════════ */
+  .alert-card {
+    background: rgba(248,81,73,0.08);
+    border: 1px solid rgba(248,81,73,0.3);
+    border-radius: var(--radius-sm);
+    padding: 1rem 1.25rem;
+    display: flex; gap: 12px; align-items: flex-start;
+    margin-top: 1rem;
+  }
+  .alert-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 2px; }
+  .alert-text { font-size: 0.85rem; color: #f85149; font-weight: 500; line-height: 1.5; }
+  .alert-sub { font-size: 0.78rem; color: var(--muted); margin-top: 4px; font-weight: 400; }
+
+  .success-card {
+    background: rgba(63,185,80,0.08);
+    border: 1px solid rgba(63,185,80,0.3);
+    border-radius: var(--radius-sm);
+    padding: 1rem 1.25rem;
+    display: flex; gap: 12px; align-items: flex-start;
+    margin-top: 1rem;
+  }
+  .success-card .alert-text { color: var(--green); }
+
+  /* ═══════════════════════════════════════════
+     POWER METER WIDGET
+  ═══════════════════════════════════════════ */
+  .power-widget {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+  }
+  .power-widget h4 { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  .device-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 1rem;
+  }
+  .device-icon { font-size: 1.2rem; }
+  .device-info { flex: 1; }
+  .device-name { font-size: 0.85rem; font-weight: 600; }
+  .device-watt { font-size: 0.75rem; color: var(--muted); }
+  .device-bar { width: 100%; height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .device-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+  .power-total {
+    margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .total-label { font-size: 0.8rem; color: var(--muted); }
+  .total-value { font-size: 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .meter-ring {
+    width: 120px; height: 120px; position: relative;
+    margin: 1rem auto 0;
+  }
+  .meter-ring svg { transform: rotate(-90deg); }
+  .meter-label {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .meter-label .val { font-size: 1.1rem; font-weight: 700; }
+  .meter-label .unit { font-size: 0.65rem; color: var(--muted); }
+
+  /* ═══════════════════════════════════════════
+     TOGGLE SWITCHES (interactive demo)
+  ═══════════════════════════════════════════ */
+  .toggle-demo {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+  }
+  .toggle-demo h4 { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-of-type { border: none; }
+  .toggle-left { display: flex; gap: 12px; align-items: center; }
+  .toggle-name { font-size: 0.9rem; font-weight: 600; }
+  .toggle-watts { font-size: 0.75rem; color: var(--muted); }
+  .toggle { position: relative; width: 44px; height: 24px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: var(--border); border-radius: 12px;
+    cursor: pointer; transition: background 0.25s;
+  }
+  .toggle-thumb {
+    position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--muted); transition: all 0.25s;
+  }
+  .toggle input:checked ~ .toggle-track { background: var(--electric); }
+  .toggle input:checked ~ .toggle-thumb { background: #fff; transform: translateX(20px); }
+
+  /* ═══════════════════════════════════════════
+     FOOTER
+  ═══════════════════════════════════════════ */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem clamp(1rem, 4vw, 3rem);
+    display: flex; flex-wrap: wrap; align-items: center;
+    justify-content: space-between; gap: 1rem;
+    background: var(--surface);
+  }
+  .footer-left { font-size: 0.8rem; color: var(--muted); }
+  .footer-badge {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 0.7rem; font-weight: 600; padding: 3px 10px;
+    border-radius: 20px; border: 1px solid var(--border);
+    color: var(--muted); background: var(--surface2);
+  }
+
+  /* ═══════════════════════════════════════════
+     RESPONSIVE OVERRIDES
+  ═══════════════════════════════════════════ */
+  @media (max-width: 640px) {
+    .topnav-pills { gap: 4px; }
+    .pill { padding: 4px 10px; font-size: 0.72rem; }
+    .hero { padding: 2.5rem 1rem; }
+    .uml-children { grid-template-columns: 1fr; }
+    .stats-bar { grid-template-columns: 1fr 1fr; }
+    .cards-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ═══════════════════════════════════════════
+     SCROLL REVEAL
+  ═══════════════════════════════════════════ */
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.5s, transform 0.5s; }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  /* ═══════════════════════════════════════════
+     SECTION ANCHORS (for nav pills)
+  ═══════════════════════════════════════════ */
+  section { scroll-margin-top: 70px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ══ TOP NAV ══ -->
+  <nav class="topnav">
+    <a class="topnav-brand" href="#">
+      <div class="brand-icon">⚡</div>
+      SmartHome OOP
+    </a>
+    <ul class="topnav-pills">
+      <li class="pill active" onclick="scrollTo('intro')">المقدمة</li>
+      <li class="pill" onclick="scrollTo('concepts')">المفاهيم</li>
+      <li class="pill" onclick="scrollTo('inheritance')">الوراثة</li>
+      <li class="pill" onclick="scrollTo('operator')">التحميل الزائد</li>
+      <li class="pill" onclick="scrollTo('demo')">النظام الحي</li>
+      <li class="pill" onclick="scrollTo('fullcode')">الكود الكامل</li>
+    </ul>
+  </nav>
+
+  <main>
+
+    <!-- ══ HERO ══ -->
+    <section class="hero" id="intro">
+      <div class="hero-eyebrow"><span></span> مشروع OOP — البرمجة كائنية التوجه</div>
+      <h1>Smart Home<br><em>Load Management</em></h1>
+      <p class="hero-sub">نظام ذكي لإدارة الأحمال الكهربائية في المنزل — يستخدم مفاهيم OOP لمنع انقطاع التيار قبل وقوعه.</p>
+      <div class="hero-team">
+        <div class="avatar-chip"><div class="avatar" style="background:#2980b9">م</div>محمد الببيلي</div>
+        <div class="avatar-chip"><div class="avatar" style="background:#8e44ad">ن</div>نور المطلق</div>
+        <div class="avatar-chip"><div class="avatar" style="background:#27ae60">ل</div>ليث الخرفان</div>
+        <div class="avatar-chip"><div class="avatar" style="background:#c0392b">أ</div>أرام إبراهيم</div>
+      </div>
+      <button class="hero-scroll" onclick="scrollTo('concepts')">
+        استعرض المشروع ↓
+      </button>
+    </section>
+
+    <!-- ══ STATS ══ -->
+    <div class="stats-bar reveal">
+      <div class="stat">
+        <div class="stat-value" style="color:var(--electric)">4</div>
+        <div class="stat-label">مفاهيم OOP</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" style="color:#a371f7">3</div>
+        <div class="stat-label">صفوف برمجية</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" style="color:var(--amber)">2050</div>
+        <div class="stat-label">واط إجمالي</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" style="color:var(--red)">1</div>
+        <div class="stat-label">نظام حماية</div>
+      </div>
+    </div>
+
+    <div class="content-grid">
+
+      <!-- ══ SECTION 1: OOP CONCEPTS ══ -->
+      <section id="concepts" class="reveal">
+        <div class="section-header">
+          <div class="section-tag">الفصل ١ و ٢</div>
+          <h2 class="section-title">الصفوف والتغليف</h2>
+          <div class="section-line"></div>
+        </div>
+        <div class="cards-grid">
+          <div class="concept-card">
+            <div class="card-icon" style="background:rgba(0,212,255,0.12)">📦</div>
+            <div class="card-title">التغليف — Encapsulation</div>
+            <div class="card-desc">إخفاء البيانات الداخلية وحمايتها. المتغيرات <code style="font-family:monospace;color:var(--electric)">protected</code> لا يمكن الوصول إليها مباشرةً من الخارج.</div>
+            <div class="card-badge" style="color:var(--electric);border-color:rgba(0,212,255,0.3)">protected / private</div>
+          </div>
+          <div class="concept-card">
+            <div class="card-icon" style="background:rgba(163,113,247,0.12)">🔧</div>
+            <div class="card-title">الباني — Constructor</div>
+            <div class="card-desc">تهيئة الجهاز عند إنشائه: الاسم وقدرة الاستهلاك والحالة الافتراضية <code style="font-family:monospace;color:#a371f7">isOn = false</code>.</div>
+            <div class="card-badge" style="color:#a371f7;border-color:rgba(163,113,247,0.3)">Constructor</div>
+          </div>
+          <div class="concept-card">
+            <div class="card-icon" style="background:rgba(63,185,80,0.12)">⚙️</div>
+            <div class="card-title">الدوال العامة — Methods</div>
+            <div class="card-desc">واجهات التحكم بالجهاز: <code style="font-family:monospace;color:var(--green)">turnOn()</code> و <code style="font-family:monospace;color:var(--red)">turnOff()</code> و <code style="font-family:monospace;color:var(--green)">showStatus()</code>.</div>
+            <div class="card-badge" style="color:var(--green);border-color:rgba(63,185,80,0.3)">public methods</div>
+          </div>
+          <div class="concept-card">
+            <div class="card-icon" style="background:rgba(244,166,42,0.12)">🏠</div>
+            <div class="card-title">الغرض — Object</div>
+            <div class="card-desc">كل جهاز في المنزل هو غرض برمجي مستقل بياناته وسلوكه، يمثل واقعاً ملموساً في الكود.</div>
+            <div class="card-badge" style="color:var(--amber);border-color:rgba(244,166,42,0.3)">Object Instance</div>
+          </div>
+        </div>
+
+        <!-- Code: SmartDevice base class -->
+        <div style="margin-top:1.5rem;">
+          <div class="code-panel">
+            <div class="code-header">
+              <div class="code-dots">
+                <div class="code-dot" style="background:#ff5f57"></div>
+                <div class="code-dot" style="background:#febc2e"></div>
+                <div class="code-dot" style="background:#28c840"></div>
+              </div>
+              <span class="code-filename">SmartDevice.cpp</span>
+              <span class="code-lang">C++</span>
+            </div>
+<pre class="code-body"><span class="kw">class</span> <span class="tp">SmartDevice</span> {
+<span class="kw">protected</span>:                        <span class="cm">// التغليف: محمية من الخارج</span>
+    <span class="tp">string</span> deviceName;
+    <span class="tp">int</span>    powerConsumption;       <span class="cm">// بالواط</span>
+    <span class="tp">bool</span>   isOn;
+
+<span class="kw">public</span>:
+    <span class="cm">// الباني: يهيئ الجهاز عند إنشائه</span>
+    <span class="tp">SmartDevice</span>(<span class="tp">string</span> name = <span class="st">"Unknown"</span>, <span class="tp">int</span> power = <span class="nm">0</span>) {
+        deviceName        = name;
+        powerConsumption  = power;
+        isOn              = <span class="kw">false</span>;   <span class="cm">// الافتراضي: مطفي</span>
+    }
+
+    <span class="kw">void</span> <span class="fn">turnOn</span>()  { isOn = <span class="kw">true</span>;  }
+    <span class="kw">void</span> <span class="fn">turnOff</span>() { isOn = <span class="kw">false</span>; }
+
+    <span class="kw">void</span> <span class="fn">showStatus</span>() {
+        cout <span class="op">&lt;&lt;</span> <span class="st">"- "</span> <span class="op">&lt;&lt;</span> deviceName
+             <span class="op">&lt;&lt;</span> <span class="st">" is "</span> <span class="op">&lt;&lt;</span> (isOn ? <span class="st">"ON"</span> : <span class="st">"OFF"</span>) <span class="op">&lt;&lt;</span> endl;
+    }
+};</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ SECTION 2: INHERITANCE ══ -->
+      <section id="inheritance" class="reveal">
+        <div class="section-header">
+          <div class="section-tag">الفصل ٤</div>
+          <h2 class="section-title">الوراثة — Inheritance</h2>
+          <div class="section-line"></div>
+        </div>
+
+        <div class="split">
+          <!-- UML Diagram -->
+          <div class="uml-wrapper">
+            <div class="uml-diagram">
+
+              <!-- Base class -->
+              <div class="uml-class base">
+                <div class="uml-head base">
+                  <span class="uml-stereotype">&lt;&lt;base class&gt;&gt;</span>
+                  SmartDevice
+                </div>
+                <div class="uml-body">
+                  <div class="uml-field"><span class="uml-access">#</span><span class="uml-ftype">string</span><span class="uml-fname">deviceName</span></div>
+                  <div class="uml-field"><span class="uml-access">#</span><span class="uml-ftype">int</span><span class="uml-fname">powerConsumption</span></div>
+                  <div class="uml-field"><span class="uml-access">#</span><span class="uml-ftype">bool</span><span class="uml-fname">isOn</span></div>
+                  <div class="uml-divider"></div>
+                  <div class="uml-method">+ turnOn() : void</div>
+                  <div class="uml-method">+ turnOff() : void</div>
+                  <div class="uml-method">+ showStatus() : void</div>
+                  <div class="uml-method">+ operator+() : int</div>
+                </div>
+              </div>
+
+              <!-- Arrow down -->
+              <div class="uml-connector">
+                <div class="uml-line"></div>
+                <div style="width:16px;height:16px;border:2px solid var(--border);border-top:none;border-right:none;transform:rotate(-45deg) translateX(2px);background:var(--code-bg);margin-top:-6px;"></div>
+                <div class="uml-label" style="margin-top:4px">Inherits</div>
+              </div>
+
+              <!-- Children row -->
+              <div style="display:flex;gap:20px;justify-content:center;width:100%;">
+                <div class="uml-class child" style="width:48%">
+                  <div class="uml-head child">❄️ AirConditioner</div>
+                  <div class="uml-body">
+                    <div class="uml-field"><span class="uml-access">-</span><span class="uml-ftype">int</span><span class="uml-fname">temperature</span></div>
+                    <div class="uml-divider"></div>
+                    <div class="uml-method">+ setTemperature()</div>
+                  </div>
+                </div>
+                <div class="uml-class child" style="width:48%">
+                  <div class="uml-head child">💡 SmartLight</div>
+                  <div class="uml-body">
+                    <div class="uml-field"><span class="uml-access">-</span><span class="uml-ftype">int</span><span class="uml-fname">brightness</span></div>
+                    <div class="uml-divider"></div>
+                    <div class="uml-method">+ setBrightness()</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Code -->
+          <div class="code-panel">
+            <div class="code-header">
+              <div class="code-dots">
+                <div class="code-dot" style="background:#ff5f57"></div>
+                <div class="code-dot" style="background:#febc2e"></div>
+                <div class="code-dot" style="background:#28c840"></div>
+              </div>
+              <span class="code-filename">Devices.cpp</span>
+              <span class="code-lang">C++</span>
+            </div>
+<pre class="code-body"><span class="cm">// المكيف يرث من SmartDevice</span>
+<span class="kw">class</span> <span class="tp">AirConditioner</span> : <span class="kw">public</span> <span class="tp">SmartDevice</span> {
+<span class="kw">private</span>:
+    <span class="tp">int</span> temperature;
+
+<span class="kw">public</span>:
+    <span class="tp">AirConditioner</span>(<span class="tp">string</span> name, <span class="tp">int</span> power, <span class="tp">int</span> temp)
+        : <span class="tp">SmartDevice</span>(name, power) {  <span class="cm">// استدعاء باني الأب</span>
+        temperature = temp;
+    }
+
+    <span class="kw">void</span> <span class="fn">setTemperature</span>(<span class="tp">int</span> temp) {
+        temperature = temp;
+        cout <span class="op">&lt;&lt;</span> deviceName <span class="op">&lt;&lt;</span> <span class="st">" temp set to: "</span>
+             <span class="op">&lt;&lt;</span> temperature <span class="op">&lt;&lt;</span> <span class="st">"°C"</span> <span class="op">&lt;&lt;</span> endl;
+    }
+};
+
+<span class="cm">// اللمبة ترث من SmartDevice</span>
+<span class="kw">class</span> <span class="tp">SmartLight</span> : <span class="kw">public</span> <span class="tp">SmartDevice</span> {
+<span class="kw">private</span>:
+    <span class="tp">int</span> brightness;
+
+<span class="kw">public</span>:
+    <span class="tp">SmartLight</span>(<span class="tp">string</span> name, <span class="tp">int</span> power)
+        : <span class="tp">SmartDevice</span>(name, power) {
+        brightness = <span class="nm">100</span>;            <span class="cm">// افتراضي 100%</span>
+    }
+
+    <span class="kw">void</span> <span class="fn">setBrightness</span>(<span class="tp">int</span> level) {
+        brightness = level;
+        cout <span class="op">&lt;&lt;</span> deviceName <span class="op">&lt;&lt;</span> <span class="st">" brightness: "</span>
+             <span class="op">&lt;&lt;</span> brightness <span class="op">&lt;&lt;</span> <span class="st">"%"</span> <span class="op">&lt;&lt;</span> endl;
+    }
+};</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ SECTION 3: OPERATOR OVERLOADING ══ -->
+      <section id="operator" class="reveal">
+        <div class="section-header">
+          <div class="section-tag">الفصل ٣</div>
+          <h2 class="section-title">التحميل الزائد — Operator Overloading</h2>
+          <div class="section-line"></div>
+        </div>
+
+        <div class="split">
+          <div>
+            <div class="code-panel">
+              <div class="code-header">
+                <div class="code-dots">
+                  <div class="code-dot" style="background:#ff5f57"></div>
+                  <div class="code-dot" style="background:#febc2e"></div>
+                  <div class="code-dot" style="background:#28c840"></div>
+                </div>
+                <span class="code-filename">operator+.cpp</span>
+                <span class="code-lang">C++</span>
+              </div>
+<pre class="code-body"><span class="cm">// داخل صف SmartDevice</span>
+<span class="kw">int</span> <span class="op">operator+</span>(<span class="tp">SmartDevice</span> d) {
+
+    <span class="cm">// ✅ الإصلاح المنطقي:
+    // يحسب فقط الأجهزة الشغّالة</span>
+    <span class="tp">int</span> p1 = isOn ? powerConsumption : <span class="nm">0</span>;
+    <span class="tp">int</span> p2 = d.isOn ? d.powerConsumption : <span class="nm">0</span>;
+
+    <span class="kw">return</span> p1 + p2;
+}
+
+<span class="cm">// الاستخدام في main:</span>
+<span class="tp">int</span> total = ac <span class="op">+</span> light;
+<span class="cm">// بدلاً من:
+// ac.powerConsumption + light.powerConsumption</span></pre>
+            </div>
+
+            <div class="alert-card">
+              <div class="alert-icon">⚠️</div>
+              <div>
+                <div class="alert-text">الكود الأصلي يحسب الاستهلاك حتى لو الجهاز مطفي!</div>
+                <div class="alert-sub">الإصلاح: التحقق من <code style="font-family:monospace">isOn</code> قبل إضافة القدرة.</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <!-- Visual: formula -->
+            <div class="power-widget">
+              <h4>⚡ حساب الاستهلاك المُجمَّع</h4>
+
+              <div class="device-row">
+                <div class="device-icon">❄️</div>
+                <div class="device-info">
+                  <div class="device-name">Living Room AC</div>
+                  <div class="device-watts">2000 واط — شغّال</div>
+                  <div class="device-bar"><div class="device-fill" style="width:97%;background:linear-gradient(90deg,var(--electric),#0090cc)"></div></div>
+                </div>
+              </div>
+
+              <div class="device-row">
+                <div class="device-icon">💡</div>
+                <div class="device-info">
+                  <div class="device-name">Bedroom Light</div>
+                  <div class="device-watts">50 واط — شغّالة</div>
+                  <div class="device-bar"><div class="device-fill" style="width:2.4%;background:var(--amber)"></div></div>
+                </div>
+              </div>
+
+              <div class="power-total">
+                <span class="total-label">إجمالي الاستهلاك</span>
+                <span class="total-value" style="color:var(--red)">2050 <span style="font-size:0.6em;color:var(--muted)">W</span></span>
+              </div>
+            </div>
+
+            <div class="alert-card" style="margin-top:1rem">
+              <div class="alert-icon">🔴</div>
+              <div>
+                <div class="alert-text">[WARNING]: High power load detected!</div>
+                <div class="alert-sub">2050W تجاوز الحد الأقصى 2000W — سيهبط القاطع.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ SECTION 4: LIVE DEMO ══ -->
+      <section id="demo" class="reveal">
+        <div class="section-header">
+          <div class="section-tag">تجريبي تفاعلي</div>
+          <h2 class="section-title">محاكاة النظام الحي</h2>
+          <div class="section-line"></div>
+        </div>
+
+        <div class="split">
+          <!-- Interactive toggle panel -->
+          <div class="toggle-demo">
+            <h4>🏠 لوحة التحكم — شغّل وأطفئ الأجهزة</h4>
+
+            <div class="toggle-row">
+              <div class="toggle-left">
+                <div style="font-size:1.4rem">❄️</div>
+                <div>
+                  <div class="toggle-name">Living Room AC</div>
+                  <div class="toggle-watts" id="ac-watts">2000 واط</div>
+                </div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="ac-toggle" checked onchange="updatePower()">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-left">
+                <div style="font-size:1.4rem">💡</div>
+                <div>
+                  <div class="toggle-name">Bedroom Light</div>
+                  <div class="toggle-watts" id="light-watts">50 واط</div>
+                </div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="light-toggle" checked onchange="updatePower()">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-left">
+                <div style="font-size:1.4rem">📺</div>
+                <div>
+                  <div class="toggle-name">Smart TV</div>
+                  <div class="toggle-watts" id="tv-watts">150 واط</div>
+                </div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="tv-toggle" onchange="updatePower()">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </label>
+            </div>
+
+            <div id="demo-status" class="success-card" style="margin-top:1.5rem">
+              <div class="alert-icon">✅</div>
+              <div>
+                <div class="alert-text" id="status-text">الحمل آمن — 2050W</div>
+                <div class="alert-sub" id="status-sub">ضمن الحد المسموح (2000W لكل جهاز)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Terminal output -->
+          <div class="terminal">
+            <div class="terminal-header">
+              <div class="code-dots">
+                <div class="code-dot" style="background:#ff5f57"></div>
+                <div class="code-dot" style="background:#febc2e"></div>
+                <div class="code-dot" style="background:#28c840"></div>
+              </div>
+              <span class="terminal-title">smart_home.exe — Terminal Output</span>
+            </div>
+            <div class="terminal-body" id="terminal-output">
+              <div><span class="t-prompt">$</span> <span class="t-cmd">./smart_home</span></div>
+              <div class="t-out">═══ Smart Home System Started ═══</div>
+              <div class="t-out">Turning ON Living Room AC...</div>
+              <div class="t-out">Living Room AC temp set to: 22°C</div>
+              <div class="t-out">Turning ON Bedroom Light...</div>
+              <div class="t-out">Bedroom Light brightness: 75%</div>
+              <div class="t-out">─────────────────────────────────</div>
+              <div class="t-info" id="term-power">Total Power Consumption: 2050 Watts.</div>
+              <div class="t-warn" id="term-warn">[WARNING]: High power load detected!</div>
+              <div><span class="cursor"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ SECTION 5: FULL CODE ══ -->
+      <section id="fullcode" class="reveal">
+        <div class="section-header">
+          <div class="section-tag">الكود الكامل</div>
+          <h2 class="section-title">main.cpp — المشروع كاملاً</h2>
+          <div class="section-line"></div>
+        </div>
+
+        <div class="code-panel">
+          <div class="code-header">
+            <div class="code-dots">
+              <div class="code-dot" style="background:#ff5f57"></div>
+              <div class="code-dot" style="background:#febc2e"></div>
+              <div class="code-dot" style="background:#28c840"></div>
+            </div>
+            <span class="code-filename">main.cpp — Smart Home Load Management</span>
+            <span class="code-lang">C++</span>
+          </div>
+<pre class="code-body"><span class="kw">#include</span> <span class="st">&lt;iostream&gt;</span>
+<span class="kw">#include</span> <span class="st">&lt;string&gt;</span>
+<span class="kw">using namespace</span> std;
+
+<span class="cm">// ══════════════════════════════════════
+//  الصف الأساسي — SmartDevice
+// ══════════════════════════════════════</span>
+<span class="kw">class</span> <span class="tp">SmartDevice</span> {
+<span class="kw">protected</span>:
+    <span class="tp">string</span> deviceName;
+    <span class="tp">int</span>    powerConsumption;
+    <span class="tp">bool</span>   isOn;
+
+<span class="kw">public</span>:
+    <span class="tp">SmartDevice</span>(<span class="tp">string</span> name = <span class="st">"Unknown"</span>, <span class="tp">int</span> power = <span class="nm">0</span>)
+        : deviceName(name), powerConsumption(power), isOn(<span class="kw">false</span>) {}
+
+    <span class="kw">void</span> <span class="fn">turnOn</span>()  { isOn = <span class="kw">true</span>;  }
+    <span class="kw">void</span> <span class="fn">turnOff</span>() { isOn = <span class="kw">false</span>; }
+
+    <span class="kw">void</span> <span class="fn">showStatus</span>() {
+        cout <span class="op">&lt;&lt;</span> <span class="st">"- "</span> <span class="op">&lt;&lt;</span> deviceName
+             <span class="op">&lt;&lt;</span> <span class="st">" is "</span> <span class="op">&lt;&lt;</span> (isOn ? <span class="st">"ON"</span> : <span class="st">"OFF"</span>) <span class="op">&lt;&lt;</span> endl;
+    }
+
+    <span class="cm">// ✅ التحميل الزائد — يحسب الأجهزة الشغّالة فقط</span>
+    <span class="kw">int</span> <span class="op">operator+</span>(<span class="tp">SmartDevice</span> d) {
+        <span class="tp">int</span> p1 = isOn ? powerConsumption : <span class="nm">0</span>;
+        <span class="tp">int</span> p2 = d.isOn ? d.powerConsumption : <span class="nm">0</span>;
+        <span class="kw">return</span> p1 + p2;
+    }
+};
+
+<span class="cm">// ══════════════════════════════════════
+//  الوراثة — AirConditioner
+// ══════════════════════════════════════</span>
+<span class="kw">class</span> <span class="tp">AirConditioner</span> : <span class="kw">public</span> <span class="tp">SmartDevice</span> {
+<span class="kw">private</span>:
+    <span class="tp">int</span> temperature;
+
+<span class="kw">public</span>:
+    <span class="tp">AirConditioner</span>(<span class="tp">string</span> name, <span class="tp">int</span> power, <span class="tp">int</span> temp)
+        : <span class="tp">SmartDevice</span>(name, power), temperature(temp) {}
+
+    <span class="kw">void</span> <span class="fn">setTemperature</span>(<span class="tp">int</span> temp) {
+        temperature = temp;
+        cout <span class="op">&lt;&lt;</span> deviceName <span class="op">&lt;&lt;</span> <span class="st">" temp set to: "</span>
+             <span class="op">&lt;&lt;</span> temperature <span class="op">&lt;&lt;</span> <span class="st">"°C"</span> <span class="op">&lt;&lt;</span> endl;
+    }
+};
+
+<span class="cm">// ══════════════════════════════════════
+//  الوراثة — SmartLight
+// ══════════════════════════════════════</span>
+<span class="kw">class</span> <span class="tp">SmartLight</span> : <span class="kw">public</span> <span class="tp">SmartDevice</span> {
+<span class="kw">private</span>:
+    <span class="tp">int</span> brightness;
+
+<span class="kw">public</span>:
+    <span class="tp">SmartLight</span>(<span class="tp">string</span> name, <span class="tp">int</span> power)
+        : <span class="tp">SmartDevice</span>(name, power), brightness(<span class="nm">100</span>) {}
+
+    <span class="kw">void</span> <span class="fn">setBrightness</span>(<span class="tp">int</span> level) {
+        brightness = level;
+        cout <span class="op">&lt;&lt;</span> deviceName <span class="op">&lt;&lt;</span> <span class="st">" brightness: "</span>
+             <span class="op">&lt;&lt;</span> brightness <span class="op">&lt;&lt;</span> <span class="st">"%"</span> <span class="op">&lt;&lt;</span> endl;
+    }
+};
+
+<span class="cm">// ══════════════════════════════════════
+//  نقطة التشغيل
+// ══════════════════════════════════════</span>
+<span class="kw">const int</span> MAX_LOAD = <span class="nm">2000</span>;    <span class="cm">// ✅ ثابت بدلاً من رقم مكتوب مباشرة</span>
+
+<span class="kw">int</span> <span class="fn">main</span>() {
+    <span class="tp">AirConditioner</span> ac   (<span class="st">"Living Room AC"</span>, <span class="nm">2000</span>, <span class="nm">24</span>);
+    <span class="tp">SmartLight</span>     light (<span class="st">"Bedroom Light"</span>,  <span class="nm">50</span>);
+
+    ac.turnOn();
+    ac.setTemperature(<span class="nm">22</span>);
+
+    light.turnOn();
+    light.setBrightness(<span class="nm">75</span>);
+
+    <span class="tp">int</span> totalPower = ac + light;
+    cout <span class="op">&lt;&lt;</span> <span class="st">"\nTotal Power Consumption: "</span>
+         <span class="op">&lt;&lt;</span> totalPower <span class="op">&lt;&lt;</span> <span class="st">" Watts."</span> <span class="op">&lt;&lt;</span> endl;
+
+    <span class="kw">if</span> (totalPower > MAX_LOAD) {
+        cout <span class="op">&lt;&lt;</span> <span class="st">"[WARNING]: High power load detected!"</span> <span class="op">&lt;&lt;</span> endl;
+    }
+
+    <span class="kw">return</span> <span class="nm">0</span>;
+}</pre>
+        </div>
+      </section>
+
+    </div><!-- /content-grid -->
+  </main>
+
+  <!-- ══ FOOTER ══ -->
+  <footer class="footer">
+    <div class="footer-left">
+      Smart Home OOP — مشروع C++ &nbsp;·&nbsp; البرمجة كائنية التوجه
+    </div>
+    <div class="footer-badge">
+      <span class="badge">Encapsulation</span>
+      <span class="badge">Inheritance</span>
+      <span class="badge">Operator Overloading</span>
+      <span class="badge">C++17</span>
+    </div>
+  </footer>
+
+</div><!-- /app -->
+
+<script>
+  /* ══ SCROLL SPY ══ */
+  const pills = document.querySelectorAll('.pill');
+  const sections = ['intro','concepts','inheritance','operator','demo','fullcode'];
+
+  function scrollTo(id) {
+    document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const idx = sections.indexOf(e.target.id);
+        if (idx !== -1) {
+          pills.forEach(p => p.classList.remove('active'));
+          pills[idx].classList.add('active');
+        }
+      }
+    });
+  }, { threshold: 0.3 });
+
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+
+  /* ══ SCROLL REVEAL ══ */
+  const revealObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        revealObs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+
+  /* ══ INTERACTIVE POWER DEMO ══ */
+  const devices = {
+    ac:    { watts: 2000, el: 'ac-toggle' },
+    light: { watts: 50,   el: 'light-toggle' },
+    tv:    { watts: 150,  el: 'tv-toggle' },
+  };
+  const MAX = 2000;
+
+  function updatePower() {
+    let total = 0;
+    let lines = [];
+    for (const [key, d] of Object.entries(devices)) {
+      const on = document.getElementById(d.el).checked;
+      if (on) {
+        total += d.watts;
+        lines.push(`<div class="t-out">${key === 'ac' ? '❄️ AC' : key === 'light' ? '💡 Light' : '📺 TV'}: ${d.watts}W — ON</div>`);
+      }
+    }
+
+    const statusBox = document.getElementById('demo-status');
+    const statusText = document.getElementById('status-text');
+    const statusSub  = document.getElementById('status-sub');
+    const termPower  = document.getElementById('term-power');
+    const termWarn   = document.getElementById('term-warn');
+
+    termPower.textContent = `Total Power Consumption: ${total} Watts.`;
+
+    if (total > MAX) {
+      statusBox.className = 'alert-card';
+      statusText.style.color = 'var(--red)';
+      statusText.textContent = `⚠️ تحذير — حمل زائد: ${total}W`;
+      statusSub.textContent  = `تجاوز الحد الأقصى ${MAX}W — سيهبط القاطع!`;
+      termWarn.style.display = 'block';
+      termWarn.textContent   = '[WARNING]: High power load detected! Breaker will drop.';
+    } else {
+      statusBox.className = 'success-card';
+      statusText.style.color = 'var(--green)';
+      statusText.textContent = `✅ الحمل آمن — ${total}W`;
+      statusSub.textContent  = `ضمن الحد المسموح ${MAX}W`;
+      termWarn.style.display = 'none';
+    }
+  }
+
+  updatePower();
+</script>
+</body>
+</html>
